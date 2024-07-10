@@ -10,18 +10,14 @@ import (
 
 // Verify checks if provided tokens are valid and creates new access and refresh tokens if needed.
 func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyResponse, error) {
-	logrus.Debug("Starting verification of access and refresh tokens")
 	claims, err := s.tokenizer.ParseAccessToken(req.AccessToken)
 	if err == nil {
-		logrus.Debug("Access token is valid")
-		return &pb.VerifyResponse{Valid: true}, nil
+		return &pb.VerifyResponse{Valid: true, UserId: int64(claims.UserID)}, nil
 	}
 
-	logrus.Debug("access token is invalid")
 	//Access token is invalid or expired
 	if claims == nil {
 		//Access token is invalid
-		logrus.Debug("Access token is invalid")
 		return &pb.VerifyResponse{Valid: false}, nil
 	}
 
@@ -40,7 +36,6 @@ func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyR
 	}
 
 	if storedRefreshToken != req.RefreshToken {
-		logrus.Debug("Refresh tokens do not match")
 		return &pb.VerifyResponse{Valid: false}, nil
 	}
 
@@ -63,7 +58,7 @@ func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyR
 		return nil, err
 	}
 
-	return &pb.VerifyResponse{Valid: true, AccessToken: newAccessToken, RefreshToken: newRefreshToken}, nil
+	return &pb.VerifyResponse{Valid: true, UserId: int64(claims.UserID), AccessToken: newAccessToken, RefreshToken: newRefreshToken}, nil
 }
 
 func (s *Server) CreateTokens(ctx context.Context, req *pb.CreateTokensRequest) (*pb.CreateTokensResponse, error) {

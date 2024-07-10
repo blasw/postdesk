@@ -100,3 +100,47 @@ func ValidateTokens(t *testing.T, tokens CreateTokensResponse) {
 	assert.Equal(t, 401, resp.StatusCode)
 
 }
+
+func TestCreatePost(t *testing.T) {
+	userID := 3
+	jsonBody := []byte(`{"user_id":` + fmt.Sprint(userID) + `}`)
+	req, err := http.NewRequest("POST", "http://localhost:5000/tokens/create", bytes.NewBuffer(jsonBody))
+	assert.Nil(t, err)
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	assert.Nil(t, err)
+
+	var tokens CreateTokensResponse
+	err = json.Unmarshal(body, &tokens)
+	assert.Nil(t, err)
+
+	assert.NotEmpty(t, tokens.AccessToken)
+	assert.NotEmpty(t, tokens.RefreshToken)
+
+	//-----------
+
+	postJsonBody := []byte(`{"title": "New Post", "content": "This is a new post"}`)
+	postReq, err := http.NewRequest("POST", "http://localhost:5000/posts/create", bytes.NewBuffer(postJsonBody))
+	assert.Nil(t, err)
+
+	postReq.AddCookie(&http.Cookie{
+		Name:  "access_token",
+		Value: tokens.AccessToken,
+	})
+	postReq.AddCookie(&http.Cookie{
+		Name:  "refresh_token",
+		Value: tokens.RefreshToken,
+	})
+
+	resp, err = client.Do(postReq)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+}

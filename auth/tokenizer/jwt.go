@@ -55,7 +55,6 @@ func (t *JwtTokenizer) NewRefreshToken() (string, error) {
 }
 
 func (t *JwtTokenizer) validateToken(tokenString string) error {
-	logrus.Debug("validating token")
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Ensure the signing method is what you expect
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -72,11 +71,9 @@ func (t *JwtTokenizer) validateToken(tokenString string) error {
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		logrus.Debug("token is invalid")
 		return ErrTokenInvalid
 	}
 
-	logrus.Debug("checking if token is expired")
 	// Check if the token is expired
 	if exp, ok := claims["exp"].(float64); ok {
 		if time.Unix(int64(exp), 0).Before(time.Now()) {
@@ -88,14 +85,10 @@ func (t *JwtTokenizer) validateToken(tokenString string) error {
 }
 
 func (t *JwtTokenizer) ParseAccessToken(accessToken string) (*UserClaims, error) {
-	logrus.Debug("parsing access token: ", accessToken)
 	err := t.validateToken(accessToken)
 	if err != nil && errors.Is(err, ErrTokenInvalid) {
-		logrus.Debug("access token is invalid")
 		return nil, err
 	}
-
-	logrus.Debug("access token is valid or expired")
 
 	claims := &UserClaims{}
 
@@ -106,8 +99,6 @@ func (t *JwtTokenizer) ParseAccessToken(accessToken string) (*UserClaims, error)
 		logrus.WithError(err).Error("error occurred while trying to parse token")
 		return nil, ErrTokenInvalid
 	}
-
-	logrus.Debug("Parsed successfully, claims: ", claims)
 
 	return claims, nil
 }

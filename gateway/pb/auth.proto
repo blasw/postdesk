@@ -15,8 +15,9 @@ message VerifyRequest {
 
 message VerifyResponse {
   bool valid = 1;
-  string access_token = 2;
-  string refresh_token = 3;
+  int64 user_id = 2;
+  string access_token = 3;
+  string refresh_token = 4;
 }
 
 message CreateTokensRequest {
