@@ -20,7 +20,6 @@ jobs:
 
       - name: Start services
         run: docker-compose -f docker-compose-entry.yaml up -d
-        working-directory: ./entry
 
       - name: Wait for services to start
         run: sleep 20
