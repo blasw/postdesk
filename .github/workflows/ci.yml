@@ -10,10 +10,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up go
+      - name: Set up Go
         uses: actions/setup-go@v3
 
-      - name: Set up Docker-Compose
+      - name: Set up Docker Compose
         run: |
           sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
@@ -25,7 +25,7 @@ jobs:
         run: sleep 20
 
       - name: Run E2E tests
-        run: go test -v ./...> test-results.txt
+        run: go test -v ./... > test-results.txt
         working-directory: ./tester
         continue-on-error: true
 
@@ -36,18 +36,27 @@ jobs:
         if: always()
         run: |
           echo "E2E Test Summary:"
-          cat ./tester/test-results.txt  # Adjust based on your test output
+          cat ./tester/test-results.txt
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run Go lint
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+
+      - name: Install Golint
         run: |
           go install golang.org/x/lint/golint@latest
+          echo "::add-path::$(go env GOPATH)/bin"
+
+      - name: Run Go lint
+        run: |
           golint ./entry/... > lint-results.txt
         continue-on-error: true
+
       - name: Report Linter results
         if: always()
         run: |
