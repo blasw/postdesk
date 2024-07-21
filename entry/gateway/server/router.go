@@ -235,9 +235,7 @@ func (r *Router) SignIn(c *gin.Context) {
 }
 
 // TODO
-func (r *Router) SignOut(c *gin.Context) {
-	c.Status(http.StatusOK)
-}
+func (r *Router) SignOut(c *gin.Context) {}
 
 type PostDto struct {
 	PostID string `form:"post_id" binding:"required"`
