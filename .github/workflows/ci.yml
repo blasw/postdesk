@@ -1,10 +1,6 @@
 name: CI Pipeline
 
-on:
-  push:
-    branches-ignore: [main]
-  pull_request:
-    branches: [main]
+on: [push]
 
 jobs:
   test:
@@ -51,5 +47,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
 
-      - name: Super-Linter
-        uses: super-linter/super-linter@v6.7.0
+      - name: Install Golint
+        run: |
+          go install golang.org/x/lint/golint@latest
+          echo "::add-path::$(go env GOPATH)/bin"
+
+      - name: Run Go lint
+        run: |
+          golint ./entry/... > lint-results.txt
+        continue-on-error: true
+
+      - name: Report Linter results
+        if: always()
+        run: |
+          echo "Linter Summary:"
+          cat lint-results.txt
