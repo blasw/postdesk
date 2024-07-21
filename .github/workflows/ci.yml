@@ -19,7 +19,7 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
 
       - name: Start services
-        run: docker-compose -f docker-compose-entry.yaml up -d
+        run: docker-compose up -d
         working-directory: ./entry
 
       - name: Wait for services to start
@@ -31,7 +31,7 @@ jobs:
         continue-on-error: true
 
       - name: Stop services
-        run: docker-compose -f docker-compose-entry.yaml down
+        run: docker-compose down
 
       - name: Run Go lint
         run: |
