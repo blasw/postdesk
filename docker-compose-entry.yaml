@@ -11,7 +11,7 @@ services:
 
   auth-service:
     build:
-      context: ./entry/auth
+      context: ./auth
       dockerfile: Dockerfile
     container_name: auth-service
     environment:
@@ -28,7 +28,7 @@ services:
 
   gateway:
     build:
-      context: ./entry/gateway
+      context: ./gateway
       dockerfile: Dockerfile
     container_name: gateway
     environment:
