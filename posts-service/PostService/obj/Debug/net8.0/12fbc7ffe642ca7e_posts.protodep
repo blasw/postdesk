@@ -1,2 +1,0 @@
-obj\Debug\net8.0\Protos/Posts.cs \
-obj\Debug\net8.0\Protos/PostsGrpc.cs: Protos/posts.proto
