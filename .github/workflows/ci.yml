@@ -50,9 +50,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v3
-
       - name: Super-Linter
         uses: super-linter/super-linter@v6.7.0
         env:
@@ -60,4 +57,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_GO: false
           VALIDATE_GO_MODULES: false
+          IGNORE_GENERATED_FILES: true
         continue-on-error: true
