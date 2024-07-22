@@ -27,25 +27,25 @@ func (g *Guard) VerifyTokens(c *gin.Context) {
 	accessToken, err := c.Cookie("access_token")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
+		c.Abort()
 	}
 
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
+		c.Abort()
 	}
 
 	resp, err := g.auth.Verify(ctx, &pb.VerifyRequest{AccessToken: accessToken, RefreshToken: refreshToken})
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while trying to verify tokens in auth service")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		c.Abort()
 	}
 
 	if !resp.Valid {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid tokens"})
-		return
+		c.Abort()
 	}
 
 	c.Set("userID", resp.UserId)
@@ -54,8 +54,6 @@ func (g *Guard) VerifyTokens(c *gin.Context) {
 		c.SetCookie("access_token", resp.AccessToken, 3600, "/", "localhost", false, true)
 		c.SetCookie("refresh_token", resp.RefreshToken, 3600, "/", "localhost", false, true)
 		// c.JSON(200, gin.H{"access_token": resp.AccessToken, "refresh_token": resp.RefreshToken})
-		c.Next()
-		return
 	}
 
 	c.Next()
