@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option csharp_namespace = "PostService";
+
+package greet;
+
+service PostService{
+	rpc CreatePost(CreatePostRequest) returns (CreatePostReply);
+}
+
+message CreatePostRequest{
+	string json_data = 1;
+}
+
+message CreatePostReply{
+	int32 status = 1;
+}
+
+enum PostCreationStatus{
+	Success = 0;
+	Error = 1;
+}
