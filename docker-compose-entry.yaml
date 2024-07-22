@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile
     image: posts-loadbalancer:latest
     ports:
-      - "5000:80"
+      - "5003:80"
     networks:
       - postdesk
     depends_on:
@@ -93,7 +93,7 @@ services:
   post-service2:
     container_name: post-service2
     build:
-      context: ./PostService
+      context: ./posts-service/PostService
       dockerfile: Dockerfile
     image: postservice:latest
     ports:
