@@ -58,4 +58,5 @@ jobs:
           VALIDATE_GO: false
           VALIDATE_GO_MODULES: false
           IGNORE_GENERATED_FILES: true
+          VALIDATE_CSHARP: true
         continue-on-error: true
