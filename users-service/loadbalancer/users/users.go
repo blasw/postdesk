@@ -17,7 +17,7 @@ func NewUsersService(usersAddr string) (pb.UsersServiceClient, error) {
 		return nil, err
 	}
 
-	authClient := pb.NewUsersServiceClient(client)
+	usersClient := pb.NewUsersServiceClient(client)
 
-	return authClient, nil
+	return usersClient, nil
 }

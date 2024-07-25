@@ -1,13 +1,14 @@
 .PHONY: entry-up entry-down entry-r test
 
-entry-up:
-	docker-compose -f docker-compose-entry.yaml up --build
+# disables kafka's and zookeeper's logs
+up:
+	docker-compose up --no-attach kafka --no-attach zookeeper --build
 
-entry-down:
-	docker-compose -f docker-compose-entry.yaml down
+down:
+	docker-compose down
 
-entry-r:
-	docker-compose -f docker-compose-entry.yaml down && 	docker-compose -f docker-compose-entry.yaml up --build
+re:
+	docker-compose down && docker-compose up --no-attach kafka --no-attach zookeeper --build
 
 test:
 	cd tester && gotestsum --format=short-verbose

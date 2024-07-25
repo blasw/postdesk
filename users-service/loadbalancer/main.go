@@ -5,20 +5,25 @@ import (
 	"loadbalancer/broker"
 	"loadbalancer/pb"
 	"loadbalancer/users"
+	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var currentInstance pb.UsersServiceClient
 
 var availableInstances = []pb.UsersServiceClient{}
 
-func init() {
-	required_envs := []string{"PORT", "BROKER_HOST", "BROKER_ADDR", "SERVICES_ADDRS"}
+var mu = &sync.Mutex{}
+
+func initialize() {
+	required_envs := []string{"BROKER_HOST", "BROKER_PORT", "SERVICES_ADDRS"}
 	for _, env := range required_envs {
 		if _, ok := os.LookupEnv(env); !ok {
 			logrus.Fatal("Missing environment variable: " + env)
@@ -27,13 +32,51 @@ func init() {
 
 	addrs := strings.Split(os.Getenv("SERVICES_ADDRS"), ",")
 
+	wg := sync.WaitGroup{}
+
 	for _, addr := range addrs {
-		client, err := users.NewUsersService(addr)
-		if err != nil {
-			logrus.WithError(err).WithField("addr", addr).Error("Unable to connect to users service")
-		}
-		availableInstances = append(availableInstances, client)
+		wg.Add(1)
+		go func(addr string) {
+			if err := tryConnect(addr); err != nil {
+				logrus.WithError(err).WithField("addr", addr).Error("Unable to connect to users service")
+			} else {
+				logrus.WithField("addr", addr).Info("Connected to users service")
+			}
+
+			wg.Done()
+		}(addr)
 	}
+
+	wg.Wait()
+}
+
+func tryConnect(addr string) error {
+	var err error
+
+	for i := 0; i < 10; i++ {
+		if err = ping(addr); err == nil {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	instance, err := users.NewUsersService(addr)
+	if err != nil {
+		return err
+	}
+
+	mu.Lock()
+	availableInstances = append(availableInstances, instance)
+	mu.Unlock()
+
+	logrus.Debug(len(availableInstances))
+
+	return nil
 }
 
 func loadbalancingDaemon() {
@@ -41,28 +84,30 @@ func loadbalancingDaemon() {
 		logrus.Fatal("No available instances")
 	}
 
-	var minLoad float64
+	var minLoad float32 = 0
 
 	for {
 		for _, instance := range availableInstances {
-			health, err := instance.CheckHealth(context.Background(), nil)
+			health, err := instance.CheckHealth(context.Background(), &emptypb.Empty{})
 			if err != nil {
 				logrus.WithError(err).Error("Error accured while trying to check health in users service")
 				continue
 			}
 
-			if minLoad == 0 || float64(health.Health) < minLoad {
-				minLoad = float64(health.Health)
+			if minLoad == 0 || health.Health < minLoad {
+				minLoad = health.Health
 				currentInstance = instance
 			}
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
 func signInReq(msg *sarama.ConsumerMessage) {
-	resp, err := currentInstance.SignIn(context.Background(), &pb.SignInRequest{})
+	jsonBytes := msg.Value
+
+	resp, err := currentInstance.SignIn(context.Background(), &pb.SignInRequest{Json: jsonBytes})
 
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while trying to sign in in users service")
@@ -73,7 +118,9 @@ func signInReq(msg *sarama.ConsumerMessage) {
 }
 
 func signUpReq(msg *sarama.ConsumerMessage) {
-	resp, err := currentInstance.SignUp(context.Background(), &pb.SignUpRequest{})
+	jsonBytes := msg.Value
+
+	resp, err := currentInstance.SignUp(context.Background(), &pb.SignUpRequest{Json: jsonBytes})
 
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while trying to sign up in users service")
@@ -83,10 +130,23 @@ func signUpReq(msg *sarama.ConsumerMessage) {
 	logrus.WithField("id", resp.UserId).Info("User signed up")
 }
 
+func ping(addr string) error {
+	timeout := 5 * time.Second
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return err
+	}
+	conn.Close()
+
+	return nil
+}
+
 func main() {
+	initialize()
+
 	go loadbalancingDaemon()
 
-	brokerAddr := os.Getenv("BROKER_HOST") + ":" + os.Getenv("BROKER_ADDR")
+	brokerAddr := os.Getenv("BROKER_HOST") + ":" + os.Getenv("BROKER_PORT")
 
 	broker, err := broker.NewKafkaConsumer(brokerAddr)
 	if err != nil {

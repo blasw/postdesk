@@ -11,7 +11,6 @@ import (
 )
 
 func init() {
-	//TODO: Add broker_addr in the future
 	res := utilities.CheckEnv([]string{"PORT", "AUTH_HOST", "AUTH_PORT", "BROKER_HOST", "BROKER_PORT"})
 	if res != "" {
 		logrus.Fatal(res)
