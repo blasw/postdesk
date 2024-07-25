@@ -1,22 +1,11 @@
 package broker
 
 import (
-	"context"
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
-
-type Broker interface {
-	//listens forever
-	Listen(topic string, handler func(*sarama.ConsumerMessage))
-	//creates a message
-	Produce(topic string, message []byte) (string, error)
-	//waits for message
-	WaitForMessage(ctx context.Context, topic string, uuid string) ([]byte, error)
-}
 
 type KafkaClient struct {
 	consumer sarama.Consumer
@@ -74,44 +63,12 @@ func (k *KafkaClient) Listen(topic string, handler func(*sarama.ConsumerMessage)
 	}
 }
 
-func (k *KafkaClient) Produce(topic string, msg []byte) (string, error) {
-	uniqueID := uuid.New().String()
-
+func (k *KafkaClient) Produce(topic string, msg []byte, headers ...sarama.RecordHeader) error {
 	_, _, err := k.producer.SendMessage(&sarama.ProducerMessage{
-		Topic: topic,
-		Value: sarama.ByteEncoder(msg),
-		Headers: []sarama.RecordHeader{
-			{
-				Key:   []byte("UUID"),
-				Value: []byte(uniqueID),
-			},
-		},
+		Topic:   topic,
+		Value:   sarama.ByteEncoder(msg),
+		Headers: headers,
 	})
 
-	return uniqueID, err
-}
-
-func (k *KafkaClient) WaitForMessage(ctx context.Context, topic string, uuid string) ([]byte, error) {
-	partConsumer, err := k.consumer.ConsumePartition(topic, 0, sarama.OffsetNewest)
-	if err != nil {
-		return nil, err
-	}
-	defer partConsumer.Close()
-
-	for {
-		select {
-		case msg := <-partConsumer.Messages():
-			for _, header := range msg.Headers {
-				if string(header.Key) == "UUID" && string(header.Value) == uuid {
-					return msg.Value, nil
-				}
-			}
-
-		case err := <-partConsumer.Errors():
-			return nil, err
-
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
+	return err
 }

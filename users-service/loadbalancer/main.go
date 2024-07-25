@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"loadbalancer/broker"
 	"loadbalancer/pb"
 	"loadbalancer/users"
@@ -104,30 +105,120 @@ func loadbalancingDaemon() {
 	}
 }
 
-func signInReq(msg *sarama.ConsumerMessage) {
-	jsonBytes := msg.Value
-
-	resp, err := currentInstance.SignIn(context.Background(), &pb.SignInRequest{Json: jsonBytes})
-
-	if err != nil {
-		logrus.WithError(err).Error("Error accured while trying to sign in in users service")
-		return
-	}
-
-	logrus.WithField("id", resp.UserId).Info("User signed in")
+type SignUpResponse struct {
+	UserId int64  `json:"user_id"`
+	Error  string `json:"error"`
 }
 
-func signUpReq(msg *sarama.ConsumerMessage) {
-	jsonBytes := msg.Value
+func signUpReq(kafka *broker.KafkaClient) func(msg *sarama.ConsumerMessage) {
+	return func(msg *sarama.ConsumerMessage) {
+		logrus.WithField("topic", msg.Topic).Debug("Message received")
 
-	resp, err := currentInstance.SignUp(context.Background(), &pb.SignUpRequest{Json: jsonBytes})
+		uniqueID := ""
 
-	if err != nil {
-		logrus.WithError(err).Error("Error accured while trying to sign up in users service")
-		return
+		for _, header := range msg.Headers {
+			if string(header.Key) == "UUID" {
+				uniqueID = string(header.Value)
+			}
+		}
+
+		if uniqueID == "" {
+			logrus.Error("Missing UUID header in kafka message")
+			return
+		}
+
+		jsonBytes := msg.Value
+
+		logrus.Debug("Forwarding message to users service")
+		result, err := currentInstance.SignUp(context.Background(), &pb.SignUpRequest{Json: jsonBytes})
+		logrus.Debug("Received response from users service")
+
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while trying to sign up in users service")
+			resp := SignUpResponse{Error: err.Error()}
+			respBytes, err := json.Marshal(resp)
+			if err != nil {
+				logrus.WithError(err).Error("Error accured while marshaling response")
+				return
+			}
+
+			err = kafka.Produce("sign_up_response", respBytes, sarama.RecordHeader{Key: []byte("UUID"), Value: []byte(uniqueID)})
+			if err != nil {
+				logrus.WithError(err).Error("Error accured while producing response")
+			}
+
+			return
+		}
+
+		logrus.Debug("Generating response")
+		resp := SignUpResponse{UserId: result.UserId}
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while marshaling response")
+			return
+		}
+
+		logrus.Debug("Producing response")
+		err = kafka.Produce("sign_up_response", respBytes, sarama.RecordHeader{Key: []byte("UUID"), Value: []byte(uniqueID)})
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while producing response")
+		}
 	}
+}
 
-	logrus.WithField("id", resp.UserId).Info("User signed up")
+type SignInResponse struct {
+	UserId int64  `json:"user_id"`
+	Error  string `json:"error"`
+}
+
+func signInReq(kafka *broker.KafkaClient) func(msg *sarama.ConsumerMessage) {
+	return func(msg *sarama.ConsumerMessage) {
+		uniqueID := ""
+
+		for _, header := range msg.Headers {
+			if string(header.Key) == "UUID" {
+				uniqueID = string(header.Value)
+			}
+		}
+
+		if uniqueID == "" {
+			logrus.Error("Missing UUID header in kafka message")
+			return
+		}
+
+		jsonBytes := msg.Value
+
+		result, err := currentInstance.SignIn(context.Background(), &pb.SignInRequest{Json: jsonBytes})
+
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while trying to sign in in users service")
+			resp := SignInResponse{Error: err.Error()}
+			respBytes, err := json.Marshal(resp)
+			if err != nil {
+				logrus.WithError(err).Error("Error accured while marshaling response")
+				return
+			}
+
+			err = kafka.Produce("sign_in_response", respBytes, sarama.RecordHeader{Key: []byte("UUID"), Value: []byte(uniqueID)})
+			if err != nil {
+				logrus.WithError(err).Error("Error accured while producing response")
+			}
+
+			return
+		}
+
+		resp := SignInResponse{UserId: result.UserId}
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while marshaling response")
+			return
+		}
+
+		err = kafka.Produce("sign_in_response", respBytes, sarama.RecordHeader{Key: []byte("UUID"), Value: []byte(uniqueID)})
+		if err != nil {
+			logrus.WithError(err).Error("Error accured while producing response")
+		}
+	}
 }
 
 func ping(addr string) error {
@@ -148,7 +239,7 @@ func main() {
 
 	brokerAddr := os.Getenv("BROKER_HOST") + ":" + os.Getenv("BROKER_PORT")
 
-	broker, err := broker.NewKafkaConsumer(brokerAddr)
+	broker, err := broker.NewKafkaClient(brokerAddr)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error accured while connecting to kafka broker")
 	}
@@ -156,8 +247,8 @@ func main() {
 	logrus.Info("Kafka message broker connected")
 
 	logrus.Info("Running kafka listeners...")
-	broker.Listen("sign_in", signInReq)
-	broker.Listen("sign_up", signUpReq)
+	broker.Listen("sign_in", signInReq(broker))
+	broker.Listen("sign_up", signUpReq(broker))
 
 	select {}
 }

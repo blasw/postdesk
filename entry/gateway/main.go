@@ -43,7 +43,7 @@ func main() {
 
 	logrus.Info("Auth service connected")
 
-	kafkaBroker, err := broker.NewKafkaBroker(brokerAddr)
+	kafkaBroker, err := broker.NewKafkaClient(brokerAddr)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error accured while connecting to kafka broker")
 	}

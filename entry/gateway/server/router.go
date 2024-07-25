@@ -51,12 +51,8 @@ func (r *Router) CreatePost(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "create_post",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	//TODO: FIX THIS _
+	_, err = r.broker.Produce("create_post", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
@@ -64,7 +60,6 @@ func (r *Router) CreatePost(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
-	//TODO: return created post
 }
 
 type DeletePostDto struct {
@@ -95,12 +90,8 @@ func (r *Router) DeletePost(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "delete_post",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	//TODO FIX THIS _
+	_, err = r.broker.Produce("delete_post", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
@@ -140,12 +131,8 @@ func (r *Router) GetPosts(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "get_posts",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	//TODO FIX THIS _
+	_, err = r.broker.Produce("get_posts", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
@@ -159,6 +146,10 @@ type SignUpDto struct {
 	Email    string `json:"email" binding:"required"`
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+}
+
+type UserResponse struct {
+	UserID int64 `json:"user_id"`
 }
 
 func (r *Router) SignUp(c *gin.Context) {
@@ -185,23 +176,49 @@ func (r *Router) SignUp(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "sign_up",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	logrus.Debug("Publishing to kafka")
+	uniqueID, err := r.broker.Produce("sign_up", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+	kafkaCtx, kafkaCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer kafkaCancel()
 
-	c.Status(http.StatusOK)
+	respBytes, err := r.broker.WaitForMessage(kafkaCtx, "sign_up_response", uniqueID)
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while waiting for message")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	var resp UserResponse
+	err = json.Unmarshal(respBytes, &resp)
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while unmarshaling data")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	authCtx, authCancel := context.WithTimeout(context.Background(), time.Second)
+	defer authCancel()
+
+	tokens, err := r.auth.CreateTokens(authCtx, &pb.CreateTokensRequest{UserId: uint64(resp.UserID)})
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while trying to create tokens in auth service")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("access_token", tokens.AccessToken, 0, "/", "", false, true)
+	c.SetCookie("refresh_token", tokens.RefreshToken, 0, "/", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{"access_token": tokens.AccessToken, "refresh_token": tokens.RefreshToken, "user_id": resp.UserID})
 }
 
 type SignInDto struct {
-	Username string `json:"email" binding:"required"`
+	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -219,17 +236,43 @@ func (r *Router) SignIn(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "sign_in",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	uniqueID, err := r.broker.Produce("sign_in", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+
+	kafkaCtx, kafkaCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer kafkaCancel()
+
+	respBytes, err := r.broker.WaitForMessage(kafkaCtx, "sign_in_response", uniqueID)
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while waiting for message")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	var resp UserResponse
+	err = json.Unmarshal(respBytes, &resp)
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while unmarshaling data")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	authCtx, authCancel := context.WithTimeout(context.Background(), time.Second)
+	defer authCancel()
+
+	tokens, err := r.auth.CreateTokens(authCtx, &pb.CreateTokensRequest{UserId: uint64(resp.UserID)})
+	if err != nil {
+		logrus.WithError(err).Error("Error accured while trying to create tokens in auth service")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("access_token", tokens.AccessToken, 0, "/", "", false, true)
+	c.SetCookie("refresh_token", tokens.RefreshToken, 0, "/", "", false, true)
 
 	c.Status(http.StatusOK)
 }
@@ -267,12 +310,8 @@ func (r *Router) LikePost(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "like_post",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	//TODO FIX THIS _
+	_, err = r.broker.Produce("like_post", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
@@ -306,12 +345,8 @@ func (r *Router) UnlikePost(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "unlike_post",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	// TODO FIX THIS _
+	_, err = r.broker.Produce("unlike_post", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
@@ -352,12 +387,8 @@ func (r *Router) GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	message := broker.KafkaMessage{
-		Topic: "get_user_info",
-		Data:  jsonBytes,
-	}
-
-	err = r.broker.Publish(message)
+	// TODO FIX THIS _
+	_, err = r.broker.Produce("get_user_info", jsonBytes)
 	if err != nil {
 		logrus.WithError(err).Error("Error accured while publishing to kafka")
 		c.Status(http.StatusInternalServerError)
