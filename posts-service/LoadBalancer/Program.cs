@@ -4,14 +4,20 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using LoadBalancer.Services;
 using LoadBalancer.Kafka;
+using Microsoft.Extensions.Configuration;
 
 await Task.Delay(10000);
 
-var postServiceAdresses = new List<string>() { "http://post-service1:8080", "http://post-service2:8080" };
+var configuration = new ConfigurationBuilder()
+    .AddEnvironmentVariables()
+    .Build();
 
-var bootstrapServers = "kafka:9092";
-var creationTopic = "create_post";
-var groupId = "post_service_consumer_group";
+var postServiceAdresses = configuration["POST_SERVICE_ADDRESSES"].Split(',').ToList();  
+
+var bootstrapServers = configuration["KAFKA_BROKER"];
+var creationTopic = configuration["CREATE_TOPIC"];
+var groupId = configuration["GROUP"];
+
 
 var client = new PostServiceClient(postServiceAdresses);
 var creationTopicConsumer = new KafkaConsumer(bootstrapServers, creationTopic, groupId, client);
