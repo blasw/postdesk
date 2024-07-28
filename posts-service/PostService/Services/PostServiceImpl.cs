@@ -27,7 +27,7 @@ namespace PostService.Services
                 _context.Posts.Add(post);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Post created: {Title}", post.Title);
+                _logger.LogInformation("{Time}   Post created: {Title}, Id - {Id}", DateTime.UtcNow, post.Title, post.Id);
 
                 return new CreatePostReply()
                 {

@@ -1,5 +1,6 @@
 ﻿using LoadBalancer.Services;
 using Confluent.Kafka;
+using Microsoft.Extensions.Logging;
 
 namespace LoadBalancer.Kafka
 {
@@ -11,12 +12,15 @@ namespace LoadBalancer.Kafka
 
         private readonly PostServiceClient _postServiceClient;
 
-        public KafkaConsumer(string bootstrapServers, string topic, string groupId, PostServiceClient postServiceClient)
+        private readonly ILogger<KafkaConsumer> _logger;
+
+        public KafkaConsumer(string bootstrapServers, string topic, string groupId, PostServiceClient postServiceClient, ILogger<KafkaConsumer> logger)
         {
             _bootstrapServers = bootstrapServers;
             _topic = topic;
             _groupId = groupId;
             _postServiceClient = postServiceClient;
+            _logger = logger;
         }
 
         public async Task ConsumeAsync()
@@ -35,21 +39,23 @@ namespace LoadBalancer.Kafka
                 try
                 {
                     consumer.Subscribe(_topic);
-                    Console.WriteLine("Subscribed to topic.");
+
+                    _logger.LogInformation("Subscribed to topic.");
+
                     await ConsumeMessagesAsync(consumer);
                 }
-                catch (ConsumeException e)
+                catch (ConsumeException ex)
                 {
-                    Console.WriteLine($"Consume error: {e.Error.Reason}");
-                    if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                    _logger.LogError("Consume error: {Reason}", ex.Error.Reason);
+                    if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
-                        Console.WriteLine($"Topic '{_topic}' does not exist. Waiting for it to become available...");
+                        _logger.LogWarning("Topic '{Name}' does not exist. Waiting for it to become available...", _topic);
                     }
                     await Task.Delay(5000);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Unexpected error: {ex.Message}");
+                    _logger.LogError("Unexpected error: {Message}", ex.Message);
                     await Task.Delay(5000);
                 }
                 finally
@@ -66,30 +72,18 @@ namespace LoadBalancer.Kafka
                 try
                 {
                     var consumeResult = consumer.Consume();
-                    Console.WriteLine($"Consumed message '{consumeResult.Message.Value}' at: '{consumeResult.TopicPartitionOffset}'.");
-                    _ = ProcessCreationAsync(consumeResult.Message.Value);
+                    _logger.LogInformation("Consumed message '{Message}' at: '{Topic}'.", consumeResult.Message.Value, consumeResult.TopicPartitionOffset);
+                    _ = _postServiceClient.CreatePostAsync(consumeResult.Message.Value);
                 }
-                catch (ConsumeException e)
+                catch (ConsumeException ex)
                 {
-                    Console.WriteLine($"Consume error: {e.Error.Reason}");
+                    _logger.LogError("Consume error: {Reason}", ex.Error.Reason);
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Unexpected error: {ex.Message}");
+                    _logger.LogError("Unexpected error: {Message}", ex.Message);
                 }
-            }
-        }
-
-        private async Task ProcessCreationAsync(string message)
-        {
-            try
-            {
-                await _postServiceClient.CreatePostAsync(message);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing message: {ex.Message}");
             }
         }
     }

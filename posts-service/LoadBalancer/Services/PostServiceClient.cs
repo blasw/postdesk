@@ -1,9 +1,5 @@
 ﻿using Grpc.Net.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace LoadBalancer.Services
 {
@@ -12,10 +8,14 @@ namespace LoadBalancer.Services
         private readonly List<string> _postServiceAdresses;
         private int _currentServiceIndex;
 
-        public PostServiceClient(List<string> addresses)
+        private readonly ILogger<PostServiceClient> _logger;
+
+
+        public PostServiceClient(List<string> addresses, ILogger<PostServiceClient> logger)
         {
             _postServiceAdresses = addresses;
             _currentServiceIndex = 0;
+            _logger = logger;
         }
 
         public async Task CreatePostAsync(string data)
@@ -27,7 +27,7 @@ namespace LoadBalancer.Services
 
             var response = await client.CreatePostAsync(new CreatePostRequest { JsonData = data });
 
-            Console.WriteLine("Post creation status: " + (PostCreationStatus)response.Status);
+            _logger.LogInformation("Post creation status: {Status}", (PostCreationStatus)response.Status);
         }
 
         private string GetNextServiceAddress()
