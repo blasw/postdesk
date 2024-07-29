@@ -62,6 +62,63 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     networks:
       - postdesk
+  
+  posts-loadbalancer:
+    container_name: posts-loadbalancer
+    build:
+      context: ./posts-service/LoadBalancer
+      dockerfile: Dockerfile
+    image: posts-loadbalancer:latest
+    ports:
+      - "5003:80"
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - CREATE_TOPIC=create_post
+      - DELETE_TOPIC=delete_post
+      - GROUP=post_service_consumer_group
+      - POST_SERVICE_ADDRESSES=http://post-service1:8080,http://post-service2:8080
+    networks:
+      - postdesk
+    depends_on:
+      - kafka
+      - posts-database
+  
+  post-service1:
+    container_name: post-service1
+    build:
+      context: ./posts-service/PostService
+      dockerfile: Dockerfile
+    image: postservice:latest
+    ports:
+      - "50051:8080"
+    networks:
+      - postdesk
+    depends_on:
+      - posts-database
+  
+  post-service2:
+    container_name: post-service2
+    build:
+      context: ./posts-service/PostService
+      dockerfile: Dockerfile
+    image: postservice:latest
+    ports:
+      - "50052:8080"
+    networks:
+      - postdesk
+    depends_on:
+      - posts-database
+
+  posts-database:
+    container_name: posts-database
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      SA_PASSWORD: "LZpb8R9Ozsrab6Vaez6L2oNsP1z79o2v"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    networks:
+      - postdesk
 
 networks:
   postdesk:

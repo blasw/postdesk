@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option csharp_namespace = "LoadBalancer";
+
+package greet;
+
+service PostService{
+	rpc CreatePost(CreatePostRequest) returns (CreatePostReply);
+	rpc DeletePost(DeletePostRequest) returns (DeletePostReply);
+}
+
+message CreatePostRequest{
+	string json_data = 1;
+}
+
+message CreatePostReply{
+	int32 status = 1;
+}
+
+enum PostCreationStatus{
+	POST_CREATION_SUCCESS  = 0;
+	POST_CREATION_ERROR = 1;
+}
+
+message DeletePostRequest{
+	string json_data = 1;
+}	
+
+message DeletePostReply{
+	int32 status = 1;
+}
+
+enum PostDeletionStatus{
+	POST_DELETION_SUCCESS  = 0;
+	POST_DELETION_ERROR  = 1;
+}
