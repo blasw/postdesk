@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using LoadBalancer.Core;
 
 internal class Program
 {
@@ -19,13 +20,17 @@ internal class Program
         var configuration = host.Services.GetRequiredService<IConfiguration>();
         var bootstrapServers = configuration["KAFKA_BROKER"];
         var creationTopic = configuration["CREATE_TOPIC"];
+        var deletionTopic = configuration["DELETE_TOPIC"];
         var groupId = configuration["GROUP"];
 
         var consumerFactory = host.Services.GetRequiredService<KafkaConsumerFactory>();
         var creationTopicConsumer = consumerFactory.CreateConsumer(bootstrapServers, creationTopic, groupId);
+        var deletionTopicConsumer = consumerFactory.CreateConsumer(bootstrapServers, deletionTopic, groupId);
 
-        var consumeTask = creationTopicConsumer.ConsumeAsync();  
-        await consumeTask;
+        var consumeCreationTask = creationTopicConsumer.ConsumeAsync();  
+        var consumeDeletionTask = deletionTopicConsumer.ConsumeAsync();
+
+        await Task.WhenAll(consumeCreationTask,consumeDeletionTask);
     }
 
     public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -55,5 +60,7 @@ internal class Program
 
                 services.AddTransient<KafkaConsumer>();
                 services.AddSingleton<KafkaConsumerFactory>();
+                services.AddTransient<CreatePostHandler>();
+                services.AddTransient<DeletePostHandler>();
             });
 }

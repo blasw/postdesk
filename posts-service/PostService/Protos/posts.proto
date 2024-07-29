@@ -6,6 +6,7 @@ package greet;
 
 service PostService{
 	rpc CreatePost(CreatePostRequest) returns (CreatePostReply);
+	rpc DeletePost(DeletePostRequest) returns (DeletePostReply);
 }
 
 message CreatePostRequest{
@@ -17,6 +18,19 @@ message CreatePostReply{
 }
 
 enum PostCreationStatus{
-	Success = 0;
-	Error = 1;
+	POST_CREATION_SUCCESS  = 0;
+	POST_CREATION_ERROR = 1;
+}
+
+message DeletePostRequest{
+	string json_data = 1;
+}	
+
+message DeletePostReply{
+	int32 status = 1;
+}
+
+enum PostDeletionStatus{
+	POST_DELETION_SUCCESS  = 0;
+	POST_DELETION_ERROR  = 1;
 }

@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿
+using Newtonsoft.Json;
 
 namespace PostService.Models
 {
@@ -6,13 +7,13 @@ namespace PostService.Models
     {
         public int Id { get; set; }
 
-        [JsonPropertyName("title")]
+        [JsonProperty("title")]
         public string Title { get; set; }
 
-        [JsonPropertyName("content")]
+        [JsonProperty("content")]
         public string Content { get; set; }
 
-        [JsonPropertyName("author_id")]
+        [JsonProperty("author_id")]
         public int AuthorId { get; set; }
 
         public DateTime CreatedAt { get; set; }

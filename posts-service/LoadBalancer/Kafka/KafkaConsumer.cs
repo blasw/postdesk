@@ -1,6 +1,8 @@
 ﻿using LoadBalancer.Services;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
+using LoadBalancer.Core;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LoadBalancer.Kafka
 {
@@ -11,16 +13,17 @@ namespace LoadBalancer.Kafka
         private readonly string _groupId;
 
         private readonly PostServiceClient _postServiceClient;
-
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<KafkaConsumer> _logger;
 
-        public KafkaConsumer(string bootstrapServers, string topic, string groupId, PostServiceClient postServiceClient, ILogger<KafkaConsumer> logger)
+        public KafkaConsumer(string bootstrapServers, string topic, string groupId, PostServiceClient postServiceClient, ILogger<KafkaConsumer> logger, IServiceProvider serviceProvider)
         {
             _bootstrapServers = bootstrapServers;
             _topic = topic;
             _groupId = groupId;
             _postServiceClient = postServiceClient;
             _logger = logger;
+            _serviceProvider = serviceProvider;
         }
 
         public async Task ConsumeAsync()
@@ -40,7 +43,7 @@ namespace LoadBalancer.Kafka
                 {
                     consumer.Subscribe(_topic);
 
-                    _logger.LogInformation("Subscribed to topic.");
+                    _logger.LogInformation("Subscribed to topic {Topic}.", _topic);
 
                     await ConsumeMessagesAsync(consumer);
                 }
@@ -73,7 +76,16 @@ namespace LoadBalancer.Kafka
                 {
                     var consumeResult = consumer.Consume();
                     _logger.LogInformation("Consumed message '{Message}' at: '{Topic}'.", consumeResult.Message.Value, consumeResult.TopicPartitionOffset);
-                    _ = _postServiceClient.CreatePostAsync(consumeResult.Message.Value);
+
+                    var handler = GetHandlerForTopic(_topic);
+                    if (handler != null)
+                    {
+                        await handler.HandleMessageAsync(consumeResult.Message.Value);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No handler found for topic: {Topic}", _topic);
+                    }
                 }
                 catch (ConsumeException ex)
                 {
@@ -85,6 +97,16 @@ namespace LoadBalancer.Kafka
                     _logger.LogError("Unexpected error: {Message}", ex.Message);
                 }
             }
+        }
+
+        private IMessageHandler? GetHandlerForTopic(string topic)
+        {
+            return topic switch
+            {
+                "create_post" => _serviceProvider.GetRequiredService<CreatePostHandler>(),
+                "delete_post" => _serviceProvider.GetRequiredService<DeletePostHandler>(),
+                _ => null,
+            };
         }
     }
 }

@@ -22,7 +22,7 @@ namespace LoadBalancer.Kafka
 
             _logger.LogInformation($"Creating KafkaConsumer for topic: {topic}, groupId: {groupId}");
 
-            return new KafkaConsumer(boostrapServers, topic, groupId, postServiceClient, logger);
+            return new KafkaConsumer(boostrapServers, topic, groupId, postServiceClient, logger, _serviceProvider);
         }
     }
 }

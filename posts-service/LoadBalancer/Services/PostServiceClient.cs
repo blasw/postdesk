@@ -30,6 +30,18 @@ namespace LoadBalancer.Services
             _logger.LogInformation("Post creation status: {Status}", (PostCreationStatus)response.Status);
         }
 
+        public async Task DeletePostAsync(string data)
+        {
+            var address = GetNextServiceAddress();
+
+            using var channel = GrpcChannel.ForAddress(address);    
+            var client = new PostService.PostServiceClient(channel);
+
+            var response = await client.DeletePostAsync(new DeletePostRequest { JsonData = data });
+
+            _logger.LogInformation("Post deletion status: {Status}", (PostDeletionStatus)response.Status);
+        }
+
         private string GetNextServiceAddress()
         {
             var address = _postServiceAdresses[_currentServiceIndex];

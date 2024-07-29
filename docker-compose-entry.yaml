@@ -74,6 +74,7 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
       - CREATE_TOPIC=create_post
+      - DELETE_TOPIC=delete_post
       - GROUP=post_service_consumer_group
       - POST_SERVICE_ADDRESSES=http://post-service1:8080,http://post-service2:8080
     networks:
@@ -90,11 +91,6 @@ services:
     image: postservice:latest
     ports:
       - "50051:8080"
-    environment:
-      - SQLSERVER_HOST=posts-database
-      - SQLSERVER_DB=Posts
-      - SQLSERVER_USER=sa
-      - SQLSERVER_PASSWORD=LZpb8R9Ozsrab6Vaez6L2oNsP1z79o2v
     networks:
       - postdesk
     depends_on:
