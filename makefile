@@ -8,7 +8,7 @@ down:
 	docker-compose down
 
 re:
-	docker-compose down && docker-compose up --no-attach zookeeper --build
+	docker-compose down && docker-compose up --no-attach zookeeper --no-attach kafka --build
 
 test:
 	cd tester && gotestsum --format=short-verbose

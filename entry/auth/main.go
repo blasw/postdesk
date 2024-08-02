@@ -36,7 +36,6 @@ func main() {
 	jwt_secret := os.Getenv("JWT_SECRET")
 	port := ":" + os.Getenv("PORT")
 	storage_addr := os.Getenv("STORAGE_HOST") + ":" + os.Getenv("STORAGE_PORT")
-	logrus.Debug("Storage address: ", storage_addr)
 
 	tokenizer := tokenizer.NewJwtTokenizer(jwt_secret, time.Hour*24*7, time.Hour*24*30)
 	redisStorage, err := storage.NewRedisStorage(storage_addr)

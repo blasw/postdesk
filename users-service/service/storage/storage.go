@@ -4,6 +4,7 @@ import (
 	"time"
 	"users-service/storage/entities"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -54,7 +55,7 @@ func (s *PostgreStorage) CreateUser(user *entities.User) (int64, error) {
 }
 
 func (s *PostgreStorage) GetUserByID(id uint64) (*entities.User, error) {
-	var user *entities.User
+	user := &entities.User{}
 
 	if err := s.db.First(user, id).Error; err != nil {
 		return nil, err
@@ -64,9 +65,10 @@ func (s *PostgreStorage) GetUserByID(id uint64) (*entities.User, error) {
 }
 
 func (s *PostgreStorage) GetUserByUsername(username string) (*entities.User, error) {
-	var user *entities.User
+	user := &entities.User{}
 
 	if err := s.db.First(user, "username = ?", username).Error; err != nil {
+		logrus.WithError(err).Error("Unable to get user by username")
 		return nil, err
 	}
 

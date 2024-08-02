@@ -52,11 +52,6 @@ func (k *KafkaClient) Listen(topic string, handler func(*sarama.ConsumerMessage)
 		go func(consumer sarama.PartitionConsumer) {
 			defer consumer.AsyncClose()
 			for msg := range cons.Messages() {
-				logrus.WithFields(logrus.Fields{
-					"topic":   msg.Topic,
-					"message": string(msg.Value),
-				}).Debug("Message received")
-
 				handler(msg)
 			}
 		}(cons)

@@ -12,22 +12,21 @@ service UsersService {
 }
 
 message SignUpRequest {
-  string username = 1;
-  string password = 2;
-  string email = 3;
+  bytes json = 1;
 }
 
 message SignUpResponse {
   int64 user_id = 1;
+  int32 status = 2;
 }
 
 message SignInRequest {
-  string username = 1;
-  string password = 2;
+  bytes json = 1;
 }
 
 message SignInResponse {
   int64 user_id = 1;
+  int32 status = 2;
 }
 
 // less is better

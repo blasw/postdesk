@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -13,7 +12,7 @@ type Broker interface {
 	//listens forever
 	Listen(topic string, handler func(*sarama.ConsumerMessage))
 	//creates a message
-	Produce(topic string, message []byte) (string, error)
+	Produce(uuid string, topic string, message []byte) error
 	//waits for message
 	WaitForMessage(ctx context.Context, topic string, uuid string) ([]byte, error)
 }
@@ -45,6 +44,29 @@ func NewKafkaClient(addr string) (*KafkaClient, error) {
 		return nil, err
 	}
 
+	config := sarama.NewConfig()
+	config.Version = sarama.V3_6_0_0
+
+	admin, err := sarama.NewClusterAdmin([]string{addr}, config)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := admin.Close(); err != nil {
+			logrus.Fatal(err)
+		}
+	}()
+
+	//CREATING TOPICS
+	topics := []string{"create_topic", "create_topic_response", "delete_post", "like_post", "unlike_post", "get_posts", "get_posts_response", "sign_up", "sign_up_response", "sign_in", "sign_in_response"}
+
+	for _, topic := range topics {
+		_ = admin.CreateTopic(topic, &sarama.TopicDetail{
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		}, false)
+	}
+
 	return &KafkaClient{consumer, producer}, nil
 }
 
@@ -63,32 +85,25 @@ func (k *KafkaClient) Listen(topic string, handler func(*sarama.ConsumerMessage)
 		go func(consumer sarama.PartitionConsumer) {
 			defer consumer.AsyncClose()
 			for msg := range cons.Messages() {
-				logrus.WithFields(logrus.Fields{
-					"topic":   msg.Topic,
-					"message": string(msg.Value),
-				}).Debug("Message received")
-
 				handler(msg)
 			}
 		}(cons)
 	}
 }
 
-func (k *KafkaClient) Produce(topic string, msg []byte) (string, error) {
-	uniqueID := uuid.New().String()
-
+func (k *KafkaClient) Produce(uuid string, topic string, msg []byte) error {
 	_, _, err := k.producer.SendMessage(&sarama.ProducerMessage{
 		Topic: topic,
 		Value: sarama.ByteEncoder(msg),
 		Headers: []sarama.RecordHeader{
 			{
 				Key:   []byte("UUID"),
-				Value: []byte(uniqueID),
+				Value: []byte(uuid),
 			},
 		},
 	})
 
-	return uniqueID, err
+	return err
 }
 
 func (k *KafkaClient) WaitForMessage(ctx context.Context, topic string, uuid string) ([]byte, error) {
