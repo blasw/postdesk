@@ -12,3 +12,6 @@ re:
 
 test:
 	cd tester && gotestsum --format=short-verbose
+
+me:
+	docker-compose -f docker-compose-monitor.yaml up --no-attach kafka --no-attach zookeper  --build
