@@ -28,7 +28,7 @@ func NewRedisStorage(addr string) (*RedisStorage, error) {
 	for i := 0; i < 10; i++ {
 		_, err = rdb.Ping(ctx).Result()
 		if err == nil {
-			logrus.Debug("Storage connected")
+			logrus.Info("Storage connected")
 			break
 		}
 		logrus.Debug("Failed to connect to storage. Try: ", i+1)

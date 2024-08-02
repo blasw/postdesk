@@ -52,6 +52,8 @@ services:
       - "2181:2181"
     networks:
       - postdesk
+    logging:
+      driver: none
 
   kafka:
     container_name: kafka
@@ -62,7 +64,48 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     networks:
       - postdesk
-  
+    logging:
+      driver: none
+
+  users_storage:
+    container_name: users_storage
+    image: postgres:17beta2-alpine3.20
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    networks:
+      - postdesk
+
+  users_balancer:
+    build:
+      context: ./users-service/loadbalancer
+      dockerfile: Dockerfile
+    container_name: users_balancer
+    depends_on:
+      - kafka
+      - users_service
+    networks:
+      - postdesk
+    environment:
+      - BROKER_HOST=kafka
+      - BROKER_PORT=9092
+      - SERVICES_ADDRS=users_service:5002
+
+  users_service:
+    build:
+      context: ./users-service/service
+      dockerfile: Dockerfile
+    container_name: users_service
+    environment:
+      - DB_ADDR=postgres://postgres:secret@users_storage?sslmode=disable
+      - PORT=5002
+    depends_on:
+      - users_storage
+    ports:
+      - "5002:5002"
+
   posts-loadbalancer:
     container_name: posts-loadbalancer
     build:
@@ -82,7 +125,7 @@ services:
     depends_on:
       - kafka
       - posts-database
-  
+
   post-service1:
     container_name: post-service1
     build:
@@ -95,7 +138,7 @@ services:
       - postdesk
     depends_on:
       - posts-database
-  
+
   post-service2:
     container_name: post-service2
     build:

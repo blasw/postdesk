@@ -24,7 +24,6 @@ func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyR
 	err = s.tokenizer.ParseRefreshToken(req.RefreshToken)
 	if err != nil {
 		// Access token is expired and refresh token is invalid
-		logrus.WithError(err).Error("Both access is expired, refresh token is invalid or expired")
 		return &pb.VerifyResponse{Valid: false}, nil
 	}
 

@@ -11,7 +11,6 @@ import (
 )
 
 func init() {
-	//TODO: Add broker_addr in the future
 	res := utilities.CheckEnv([]string{"PORT", "AUTH_HOST", "AUTH_PORT", "BROKER_HOST", "BROKER_PORT"})
 	if res != "" {
 		logrus.Fatal(res)
@@ -44,7 +43,7 @@ func main() {
 
 	logrus.Info("Auth service connected")
 
-	kafkaBroker, err := broker.NewKafkaBroker(brokerAddr)
+	kafkaBroker, err := broker.NewKafkaClient(brokerAddr)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error accured while connecting to kafka broker")
 	}
