@@ -19,6 +19,9 @@ services:
       - STORAGE_HOST=redis-tokens
       - STORAGE_PORT=6379
       - JWT_SECRET=secret
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - redis-tokens
     ports:
@@ -37,6 +40,9 @@ services:
       - AUTH_PORT=5001
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - auth-service
       - kafka
@@ -92,6 +98,9 @@ services:
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
       - SERVICES_ADDRS=users_service:5002
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
 
   users_service:
     build:
@@ -101,6 +110,9 @@ services:
     environment:
       - DB_ADDR=postgres://postgres:secret@users_storage?sslmode=disable
       - PORT=5002
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - users_storage
     ports:
@@ -125,6 +137,31 @@ services:
       - "3000:3000"
     networks:
       - postdesk
+
+  elastic:
+    image: elasticsearch:8.14.3
+    container_name: elastic
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false # Disable security features
+      - xpack.security.http.ssl.enabled=false
+    networks:
+      - postdesk
+
+  kibana:
+    image: kibana:8.14.3
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elastic
+    networks:
+      - postdesk
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elastic:9200
 
 networks:
   postdesk:

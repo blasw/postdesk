@@ -19,6 +19,7 @@ services:
       - STORAGE_HOST=redis-tokens
       - STORAGE_PORT=6379
       - JWT_SECRET=secret
+      - ELASTIC=false
     depends_on:
       - redis-tokens
     ports:
@@ -37,6 +38,7 @@ services:
       - AUTH_PORT=5001
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
+      - ELASTIC=false
     depends_on:
       - auth-service
       - kafka
@@ -92,6 +94,7 @@ services:
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
       - SERVICES_ADDRS=users_service:5002
+      - ELASTIC=false
 
   users_service:
     build:
@@ -101,10 +104,13 @@ services:
     environment:
       - DB_ADDR=postgres://postgres:secret@users_storage?sslmode=disable
       - PORT=5002
+      - ELASTIC=false
     depends_on:
       - users_storage
     ports:
       - "5002:5002"
+    networks:
+      - postdesk
 
   posts-loadbalancer:
     container_name: posts-loadbalancer
