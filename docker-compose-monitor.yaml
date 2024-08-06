@@ -19,7 +19,9 @@ services:
       - STORAGE_HOST=redis-tokens
       - STORAGE_PORT=6379
       - JWT_SECRET=secret
-      - ELASTIC=false
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - redis-tokens
     ports:
@@ -38,7 +40,9 @@ services:
       - AUTH_PORT=5001
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
-      - ELASTIC=false
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - auth-service
       - kafka
@@ -94,7 +98,9 @@ services:
       - BROKER_HOST=kafka
       - BROKER_PORT=9092
       - SERVICES_ADDRS=users_service:5002
-      - ELASTIC=false
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
 
   users_service:
     build:
@@ -104,7 +110,9 @@ services:
     environment:
       - DB_ADDR=postgres://postgres:secret@users_storage?sslmode=disable
       - PORT=5002
-      - ELASTIC=false
+      - ELASTIC=true
+      - ELASTIC_HOST=elastic
+      - ELASTIC_PORT=9200
     depends_on:
       - users_storage
     ports:
@@ -112,62 +120,48 @@ services:
     networks:
       - postdesk
 
-  posts-loadbalancer:
-    container_name: posts-loadbalancer
-    build:
-      context: ./posts-service/LoadBalancer
-      dockerfile: Dockerfile
-    image: posts-loadbalancer:latest
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "5003:80"
+      - "9090:9090"
+    networks:
+      - postdesk
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - postdesk
+
+  elastic:
+    image: elasticsearch:8.14.3
+    container_name: elastic
+    ports:
+      - "9200:9200"
     environment:
-      - KAFKA_BROKER=kafka:9092
-      - CREATE_TOPIC=create_post
-      - DELETE_TOPIC=delete_post
-      - GROUP=post_service_consumer_group
-      - POST_SERVICE_ADDRESSES=http://post-service1:8080,http://post-service2:8080
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false # Disable security features
+      - xpack.security.http.ssl.enabled=false
     networks:
       - postdesk
-    depends_on:
-      - kafka
-      - posts-database
 
-  post-service1:
-    container_name: post-service1
-    build:
-      context: ./posts-service/PostService
-      dockerfile: Dockerfile
-    image: postservice:latest
+  kibana:
+    image: kibana:8.14.3
+    container_name: kibana
     ports:
-      - "50051:8080"
+      - "5601:5601"
+    depends_on:
+      - elastic
     networks:
       - postdesk
-    depends_on:
-      - posts-database
-
-  post-service2:
-    container_name: post-service2
-    build:
-      context: ./posts-service/PostService
-      dockerfile: Dockerfile
-    image: postservice:latest
-    ports:
-      - "50052:8080"
-    networks:
-      - postdesk
-    depends_on:
-      - posts-database
-
-  posts-database:
-    container_name: posts-database
-    image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
-      SA_PASSWORD: "LZpb8R9Ozsrab6Vaez6L2oNsP1z79o2v"
-      ACCEPT_EULA: "Y"
-    ports:
-      - "1433:1433"
-    networks:
-      - postdesk
+      - ELASTICSEARCH_HOSTS=http://elastic:9200
 
 networks:
   postdesk:

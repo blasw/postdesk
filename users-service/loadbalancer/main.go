@@ -14,8 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"gopkg.in/go-extras/elogrus.v8"
 )
 
 var currentInstance pb.UsersServiceClient
@@ -30,7 +32,7 @@ var (
 )
 
 func initialize() {
-	required_envs := []string{"BROKER_HOST", "BROKER_PORT", "SERVICES_ADDRS"}
+	required_envs := []string{"BROKER_HOST", "BROKER_PORT", "SERVICES_ADDRS", "ELASTIC"}
 	for _, env := range required_envs {
 		if _, ok := os.LookupEnv(env); !ok {
 			logrus.Fatal("Missing environment variable: " + env)
@@ -121,6 +123,9 @@ func ping(addr string) error {
 }
 
 func initLogger() {
+	var err error
+	var hook *elogrus.ElasticHook
+
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		ForceColors:   true,
@@ -128,6 +133,36 @@ func initLogger() {
 	})
 	logrus.SetReportCaller(true)
 	logrus.SetOutput(os.Stdout)
+
+	if os.Getenv("ELASTIC") == "false" {
+		return
+	}
+
+	eHost := os.Getenv("ELASTIC_HOST")
+	ePORT := os.Getenv("ELASTIC_PORT")
+
+	cfg := elasticsearch.Config{
+		Addresses: []string{"http://" + eHost + ":" + ePORT},
+	}
+
+	esClient, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	for i := 0; i < 40; i++ {
+		hook, err = elogrus.NewAsyncElasticHook(esClient, eHost, logrus.DebugLevel, "users_loadbalancer_logs")
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	logrus.AddHook(hook)
 }
 
 func main() {
